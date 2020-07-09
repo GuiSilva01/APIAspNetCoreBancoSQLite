@@ -1,8 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using MimicAPI.Database;
+
 using MimicAPI.Helpers;
 using MimicAPI.Models;
+using MimicAPI.Repositories.Interface;
 using Newtonsoft.Json;
 using System;
 using System.CodeDom.Compiler;
@@ -16,10 +17,10 @@ namespace MimicAPI.Controllers
     [Route("api/palavras")]
     public class PalavrasController : ControllerBase
     {
-        private readonly MimicContext _banco;
-        public PalavrasController(MimicContext banco)
+        private readonly IPalavraRepository _repository;
+        public PalavrasController(IPalavraRepository repository)
         {
-            _banco = banco;
+            _repository = repository;
         }
 
         //Nesse caso quando o route está em branco ele pega a rota padão  " api/palavras?data=2020-07/05 "
@@ -27,41 +28,16 @@ namespace MimicAPI.Controllers
         [HttpGet]
         public ActionResult ObterPalavras([FromQuery]PalavraUrlQuery query)
         {
-            //Para a variavel item nao ser um arquivo de banco e sim uma query
-            var item = _banco.Palavras.AsQueryable();
+           var item =  _repository.ObterPalavras(query);
 
-            //Verificando se data tem valor
-            if (query.Data.HasValue)
+            if (query.PagNumero > item.Paginacao.TotalPagina)
             {
-                // Buscando registros do banco onde data informada for maior que a data do registro do banco
-                item = item.Where(a => a.Criado > query.Data.Value || a.Atualizado > query.Data.Value);            
+                return NotFound();
             }
 
-            if (query.PagNumero.HasValue)
-            {
-                //Contando quantos registros tem no objeto Palavras
-                var quantidadeTotalRegistros = item.Count();
+            Response.Headers.Add("X-Pagination", JsonConvert.SerializeObject(item.Paginacao));
 
-                //Logica da Paginacao          ' Skip() é pular '         ' Take() é pegar '
-                item = item.Skip((query.PagNumero.Value - 1) * query.PagRegistro.Value).Take(query.PagRegistro.Value);
-
-                var paginacao = new Paginacao();
-                paginacao.NumeroPagina = query.PagNumero.Value;
-                paginacao.RegistrosPorPagina = query.PagRegistro.Value;
-                paginacao.TotalRegistros = quantidadeTotalRegistros;
-                paginacao.TotalPagina = (int) Math.Ceiling((double)quantidadeTotalRegistros / query.PagRegistro.Value);
-
-                Response.Headers.Add("X-Pagination", JsonConvert.SerializeObject(paginacao));
-
-                if(query.PagNumero > paginacao.TotalPagina)
-                {
-                    return NotFound();
-                }
-                
-            }
-
-
-            return new JsonResult(item);
+            return new JsonResult(item.ToList());
         }
 
         
@@ -72,8 +48,8 @@ namespace MimicAPI.Controllers
         [HttpGet]
         public ActionResult Obter(int id)
         {
-            
-            var obj = _banco.Palavras.Find(id);
+
+            var obj = _repository.Obter(id);
 
             if(obj == null)
             {
@@ -81,7 +57,7 @@ namespace MimicAPI.Controllers
             }
 
             //O tipo de retorno OK devolve o tipo mais popular que nesse caso JsonResult
-            return Ok();
+            return Ok(obj);
         }
 
         // Nesse caso estamos enviando para o servidor atras do metodo POST (id, nome, ativo, pontuacao, criacao)
@@ -89,8 +65,7 @@ namespace MimicAPI.Controllers
         [HttpPost]
         public ActionResult Cadastrar([FromBody]Palavra palavra)
         {
-            _banco.Palavras.Add(palavra);
-            _banco.SaveChanges();
+            _repository.Cadastrar(palavra);
 
             return Created($"/api/palavras/{palavra.Id}", palavra);
         }
@@ -100,7 +75,7 @@ namespace MimicAPI.Controllers
         [HttpPut]
         public ActionResult Atualizar (int id, [FromBody]Palavra palavra)
         {
-            var obj = _banco.Palavras.AsNoTracking().FirstOrDefault(x => x.Id == id);
+            var obj = _repository.Obter(id);
   
             if (obj == null)
             {
@@ -108,8 +83,7 @@ namespace MimicAPI.Controllers
             }
 
             palavra.Id = id;
-            _banco.Palavras.Update(palavra);
-            _banco.SaveChanges();
+            _repository.Atualizar(palavra);
 
             return Ok();
         }
@@ -119,15 +93,16 @@ namespace MimicAPI.Controllers
         [HttpDelete]
         public ActionResult Deletar(int id)
         {
-            var palavra = _banco.Palavras.Find(id);
+            var palavra = _repository.Obter(id);
+            palavra.Ativo = false;
+
             if(palavra == null)
             {
                 return NotFound();
             }
 
-            palavra.Ativo = false;
-            _banco.Palavras.Update(palavra);
-            _banco.SaveChanges();
+            _repository.Deletar(id);
+            
 
             //Vai retorna o Codigo 204 de Sucesso mais sem conteudo para mostrar já que é uma deleção
             return NoContent();
