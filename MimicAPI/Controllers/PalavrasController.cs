@@ -1,8 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MimicAPI.Database;
+using MimicAPI.Helpers;
 using MimicAPI.Models;
+using Newtonsoft.Json;
 using System;
+using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -22,14 +25,41 @@ namespace MimicAPI.Controllers
         //Nesse caso quando o route está em branco ele pega a rota padão  " api/palavras?data=2020-07/05 "
         [Route("")]
         [HttpGet]
-        public ActionResult ObterPalavras(DateTime? data)
+        public ActionResult ObterPalavras(DateTime? data, int? pagNumero, int? pagRegistro)
         {
+            //Para a variavel item nao ser um arquivo de banco e sim uma query
             var item = _banco.Palavras.AsQueryable();
 
+            //Verificando se data tem valor
             if (data.HasValue)
             {
-                item = item.Where(a => a.Criado > data.Value);            
+                // Buscando registros do banco onde data informada for maior que a data do registro do banco
+                item = item.Where(a => a.Criado > data.Value || a.Atualizado > data.Value);            
             }
+
+            if (pagNumero.HasValue)
+            {
+                //Contando quantos registros tem no objeto Palavras
+                var quantidadeTotalRegistros = item.Count();
+
+                //Logica da Paginacao          ' Skip() é pular '         ' Take() é pegar '
+                item = item.Skip((pagNumero.Value - 1) * pagRegistro.Value).Take(pagRegistro.Value);
+
+                var paginacao = new Paginacao();
+                paginacao.NumeroPagina = pagNumero.Value;
+                paginacao.RegistrosPorPagina = pagRegistro.Value;
+                paginacao.TotalRegistros = quantidadeTotalRegistros;
+                paginacao.TotalPagina = (int) Math.Ceiling((double)quantidadeTotalRegistros / pagRegistro.Value);
+
+                Response.Headers.Add("X-Pagination", JsonConvert.SerializeObject(paginacao));
+
+                if(pagNumero > paginacao.TotalPagina)
+                {
+                    return NotFound();
+                }
+                
+            }
+
 
             return new JsonResult(item);
         }
