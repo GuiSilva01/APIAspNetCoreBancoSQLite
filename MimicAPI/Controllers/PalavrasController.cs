@@ -19,13 +19,23 @@ namespace MimicAPI.Controllers
             _banco = banco;
         }
 
-        //Nesse caso quando o route está em branco ele pega a rota padão  " api/palavras "
+        //Nesse caso quando o route está em branco ele pega a rota padão  " api/palavras?data=2020-07/05 "
         [Route("")]
         [HttpGet]
-        public ActionResult ObterPalavras()
+        public ActionResult ObterPalavras(DateTime? data)
         {
-            return new JsonResult( _banco.Palavras);
+            var item = _banco.Palavras.AsQueryable();
+
+            if (data.HasValue)
+            {
+                item = item.Where(a => a.Criado > data.Value);            
+            }
+
+            return new JsonResult(item);
         }
+
+        
+
 
         // Nesse caso está buncando por ID  " /api/palavras/1 "
         [Route("{id}")]
