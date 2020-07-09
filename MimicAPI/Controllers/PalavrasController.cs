@@ -25,35 +25,35 @@ namespace MimicAPI.Controllers
         //Nesse caso quando o route está em branco ele pega a rota padão  " api/palavras?data=2020-07/05 "
         [Route("")]
         [HttpGet]
-        public ActionResult ObterPalavras(DateTime? data, int? pagNumero, int? pagRegistro)
+        public ActionResult ObterPalavras([FromQuery]PalavraUrlQuery query)
         {
             //Para a variavel item nao ser um arquivo de banco e sim uma query
             var item = _banco.Palavras.AsQueryable();
 
             //Verificando se data tem valor
-            if (data.HasValue)
+            if (query.Data.HasValue)
             {
                 // Buscando registros do banco onde data informada for maior que a data do registro do banco
-                item = item.Where(a => a.Criado > data.Value || a.Atualizado > data.Value);            
+                item = item.Where(a => a.Criado > query.Data.Value || a.Atualizado > query.Data.Value);            
             }
 
-            if (pagNumero.HasValue)
+            if (query.PagNumero.HasValue)
             {
                 //Contando quantos registros tem no objeto Palavras
                 var quantidadeTotalRegistros = item.Count();
 
                 //Logica da Paginacao          ' Skip() é pular '         ' Take() é pegar '
-                item = item.Skip((pagNumero.Value - 1) * pagRegistro.Value).Take(pagRegistro.Value);
+                item = item.Skip((query.PagNumero.Value - 1) * query.PagRegistro.Value).Take(query.PagRegistro.Value);
 
                 var paginacao = new Paginacao();
-                paginacao.NumeroPagina = pagNumero.Value;
-                paginacao.RegistrosPorPagina = pagRegistro.Value;
+                paginacao.NumeroPagina = query.PagNumero.Value;
+                paginacao.RegistrosPorPagina = query.PagRegistro.Value;
                 paginacao.TotalRegistros = quantidadeTotalRegistros;
-                paginacao.TotalPagina = (int) Math.Ceiling((double)quantidadeTotalRegistros / pagRegistro.Value);
+                paginacao.TotalPagina = (int) Math.Ceiling((double)quantidadeTotalRegistros / query.PagRegistro.Value);
 
                 Response.Headers.Add("X-Pagination", JsonConvert.SerializeObject(paginacao));
 
-                if(pagNumero > paginacao.TotalPagina)
+                if(query.PagNumero > paginacao.TotalPagina)
                 {
                     return NotFound();
                 }
