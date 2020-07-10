@@ -10,6 +10,8 @@ using Microsoft.Extensions.DependencyInjection;
 using MimicAPI.Database;
 using MimicAPI.Repositories;
 using MimicAPI.Repositories.Interface;
+using AutoMapper;
+using MimicAPI.Helpers;
 
 namespace MimicAPI
 {
@@ -19,6 +21,16 @@ namespace MimicAPI
         // For more information on how to configure your application, visit https://go.microsoft.com/fwlink/?LinkID=398940
         public void ConfigureServices(IServiceCollection services)
         {
+            //Configurando o AutoMapper Biblioteca que consegue copiar um objeto para outro. ele mapeia as propriedades de um objeto com suas informaçoes
+            var config = new MapperConfiguration(cfg =>
+            {              
+                cfg.AddProfile( new DTOMapperProfile());
+            });
+            //
+            IMapper mapper = config.CreateMapper();
+            //Injetando por padrao Singleton ' Uma instancia para toda a aplicacao '
+            services.AddSingleton(mapper);
+
             services.AddDbContext<MimicContext>( opt => {
                 opt.UseSqlite("Data Source=Database\\Mimic.db");
             });
